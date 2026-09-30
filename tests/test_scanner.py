@@ -138,10 +138,6 @@ class StatsTest(unittest.TestCase):
         self.assertEqual(s["max_drawdown_usd"], 20)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class WatchTest(unittest.TestCase):
     def setUp(self):
         self.cfg = json.loads(json.dumps(scan.load_config()))
@@ -182,3 +178,7 @@ class WatchTest(unittest.TestCase):
         ideas = list(watch.buy_alerts([base, dict(base, symbol="HOT", chart_trend="EXTENDED"),
                                        dict(base, symbol="WEAK", score=2)], self.cfg))
         self.assertEqual([i[1] for i in ideas], ["Buy idea: GOOD (solana)"])
+
+
+if __name__ == "__main__":
+    unittest.main()

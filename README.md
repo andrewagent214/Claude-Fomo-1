@@ -76,6 +76,8 @@ Each scan also appends to `output/history.csv`. The next scans use it to show ho
 
 ## Quick start
 
+First time on your computer? Follow [`docs/SETUP.md`](docs/SETUP.md) step by step.
+
 ```bash
 python3 scanner/scan.py                      # live scan (add --no-charts to skip chart checks)
 python3 scanner/chart.py solana <pair_addr>  # chart read for one coin
