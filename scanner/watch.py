@@ -35,6 +35,7 @@ from datetime import datetime
 import chart
 import evening
 import positions
+import safety
 import scan
 
 STATE = os.path.join(scan.ROOT, "output", "alert_state.json")
@@ -96,7 +97,8 @@ def buy_alerts(watch, cfg):
         age_h = (w["age_minutes"] or 0) / 60
         yield (f"buy:{w['chain']}:{w['token_address']}", f"Buy idea: {w['symbol']} ({scan.chain_label(w, cfg)})",
                f"Score {w['score']}, chart {w['chart_trend']}, {age_h:.0f}h old"
-               f"{', hype: ' + ' '.join(w['hype']) if w['hype'] else ''}. Price {w['price_usd']:.6g}. "
+               f"{', hype: ' + ' '.join(w['hype']) if w['hype'] else ''}, safety {w.get('safety', 'unchecked')}. "
+               f"Price {w['price_usd']:.6g}. "
                f"Buy ${p['position_usd']:.0f}, stop {p['stop_price']:.6g}. Run the research checklist first.",
                "high", "moneybag", w["url"])
 
@@ -118,6 +120,7 @@ def check_once(cfg, state, do_scan, now=None):
         if lo <= hour < hi and slots > 0 and not (acct["halted"] or acct["day_halted"]):
             pairs = scan.fetch_candidate_pairs(cfg["chains"], cfg.get("hype_keywords", []))
             rows, _ = scan.run(pairs, cfg, os.path.join(scan.ROOT, "output", "scans"), candles_fn=chart.fetch_candles,
+                               safety_fn=safety.check,
                                history_path=os.path.join(scan.ROOT, "output", "history.csv"))
             ideas = [a for a in buy_alerts([r for r in rows if r["verdict"] == "WATCH"], cfg)
                      if now - state.get(a[0], 0) > 86400][:slots]  # same coin at most once a day

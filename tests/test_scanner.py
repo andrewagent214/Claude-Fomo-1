@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.join(ROOT, "scanner"))
 import chart  # noqa: E402
 import evening  # noqa: E402
 import positions  # noqa: E402
+import safety  # noqa: E402
 import scan  # noqa: E402
 import stats  # noqa: E402
 import watch  # noqa: E402
@@ -64,6 +65,63 @@ class ChartTest(unittest.TestCase):
         self.assertEqual(chart.analyze(candles([2 - i * 0.02 for i in range(48)]))["trend"], "DOWNTREND")
         self.assertEqual(chart.analyze(candles([1] * 44 + [3] * 4))["trend"], "EXTENDED")
         self.assertEqual(chart.analyze(candles([1] * 10))["trend"], "TOO NEW")
+
+
+class SafetyTest(unittest.TestCase):
+    def test_rugcheck(self):
+        ok = {"risks": [{"name": "Low amount of LP Providers", "level": "warn"}]}
+        bad = {"risks": [{"name": "Freeze Authority still enabled", "level": "danger"}]}
+        self.assertEqual(safety.judge_rugcheck(ok), ("OK", ["RugCheck warn: Low amount of LP Providers"]))
+        self.assertEqual(safety.judge_rugcheck(bad)[0], "FAIL")
+        self.assertEqual(safety.judge_rugcheck({"rugged": True})[0], "FAIL")
+
+    def test_honeypot(self):
+        clean = {"simulationSuccess": True, "honeypotResult": {"isHoneypot": False},
+                 "simulationResult": {"buyTax": 0, "sellTax": 1}, "summary": {"risk": "low", "flags": []}}
+        self.assertEqual(safety.judge_honeypot(clean, 10), ("OK", []))
+        self.assertEqual(safety.judge_honeypot(dict(clean, honeypotResult={"isHoneypot": True}), 10)[0], "FAIL")
+        self.assertEqual(safety.judge_honeypot(dict(clean, simulationSuccess=False), 10)[0], "FAIL")
+        taxed = safety.judge_honeypot(dict(clean, simulationResult={"buyTax": 0, "sellTax": 25}), 10)
+        self.assertEqual(taxed, ("FAIL", ["sell tax 25%"]))
+        self.assertEqual(safety.judge_honeypot(dict(clean, summary={"risk": "high"}), 10)[0], "FAIL")
+
+    def test_check_routes_and_never_raises(self):
+        urls = []
+
+        def fetch(url):
+            urls.append(url)
+            raise OSError("blocked")
+        safety.time.sleep, sleep = (lambda s: None), safety.time.sleep
+        try:
+            self.assertEqual(safety.check("base", "0xabc", fetch=fetch)["status"], "unchecked")
+            self.assertEqual(safety.check("solana", "Mint1", fetch=fetch)["status"], "unchecked")
+            self.assertEqual(safety.check("monad", "0xabc", fetch=fetch)["status"], "unchecked")
+        finally:
+            safety.time.sleep = sleep
+        self.assertIn("chainID=8453", urls[0])
+        self.assertIn("/tokens/Mint1/report/summary", urls[1])
+        self.assertEqual(len(urls), 2)  # unsupported chain makes no call
+
+    def test_scan_drops_failed_tokens(self):
+        with open(os.path.join(ROOT, "tests", "fixtures", "sample_pairs.json")) as f:
+            data = json.load(f)
+
+        def fake(chain, addr, max_tax):
+            return {"status": "OK", "notes": []}
+        with tempfile.TemporaryDirectory() as d:
+            rows, _ = scan.run(data["pairs"], scan.load_config(), d, data["captured_at_ms"], safety_fn=fake)
+            gooda_addr = next(r for r in rows if r["symbol"] == "GOODA")["token_address"]
+
+            def fail_gooda(chain, addr, max_tax):
+                return {"status": "FAIL", "notes": ["honeypot: x"]} if addr == gooda_addr else fake(chain, addr, max_tax)
+            rows, (_, md_path) = scan.run(data["pairs"], scan.load_config(), d, data["captured_at_ms"],
+                                          safety_fn=fail_gooda)
+            with open(md_path) as f:
+                self.assertIn("honeypot: x", f.read())
+        by_sym = {r["symbol"]: r for r in rows}
+        self.assertEqual(by_sym["GOODA"]["verdict"], "AVOID")
+        self.assertEqual(by_sym["TRUMPCAT"]["safety"], "OK")
+        self.assertNotIn("safety", by_sym["THINLQ"])  # already-rejected tokens aren't checked
 
 
 class ExitRuleTest(unittest.TestCase):

@@ -17,7 +17,9 @@ Your plan: **$50 → $100, max loss $30.** Full rules are in [`docs/STRATEGY.md`
 flowchart TD
     A[1. Scan<br/>python3 scanner/scan.py<br/>new launches + trending + Trump/Elon keywords<br/>Solana, Base, BNB, Ethereum, Monad] --> B{Safety filters<br/>liquidity, volume, age,<br/>not already +1000%}
     B -- fail --> X[AVOID - reason logged]
-    B -- pass --> C[2. Chart check<br/>PULLBACK / UPTREND = ok<br/>EXTENDED / DOWNTREND = skip]
+    B -- pass --> S{Safety check<br/>RugCheck / honeypot.is}
+    S -- FAIL --> X
+    S -- OK / unchecked --> C[2. Chart check<br/>PULLBACK / UPTREND = ok<br/>EXTENDED / DOWNTREND = skip]
     C --> D[3. Watchlist<br/>output/scans/scan_*.md]
     D --> E[4. Manual research<br/>docs/RESEARCH_CHECKLIST.md<br/>verify contract is real]
     E -- red flag --> X
@@ -79,14 +81,15 @@ Each scan also appends to `output/history.csv`. The next scans use it to show ho
 First time on your computer? Follow [`docs/SETUP.md`](docs/SETUP.md) step by step.
 
 ```bash
-python3 scanner/scan.py                      # live scan (add --no-charts to skip chart checks)
+python3 scanner/scan.py                      # live scan (--no-charts / --no-safety to skip those checks)
 python3 scanner/chart.py solana <pair_addr>  # chart read for one coin
+python3 scanner/safety.py solana <token>     # RugCheck / honeypot.is check for one coin
 python3 scanner/positions.py                 # HOLD/SELL on what you own
 python3 scanner/stats.py                     # your real performance
 python3 -m unittest discover -s tests
 ```
 
-It needs only the Python 3 standard library. The live commands need internet access to `api.dexscreener.com` and `api.geckoterminal.com`.
+It needs only the Python 3 standard library. The live commands need internet access to `api.dexscreener.com`, `api.geckoterminal.com`, `api.rugcheck.xyz`, `api.honeypot.is`, and (for alerts) `ntfy.sh`.
 For an offline demo, run `python3 scanner/scan.py --fixture tests/fixtures/sample_pairs.json`. That file holds synthetic test data.
 
 ## Folder layout
@@ -95,6 +98,7 @@ For an offline demo, run `python3 scanner/scan.py --fixture tests/fixtures/sampl
 |---|---|
 | `config.json` | Filters, hype keywords, and risk and exit rules |
 | `scanner/scan.py` | Live screener → `output/scans/`, `output/history.csv` |
+| `scanner/safety.py` | Contract check: RugCheck (Solana), honeypot.is (Base/BNB/Ethereum) → OK / FAIL / unchecked |
 | `scanner/chart.py` | Hourly chart trend: UPTREND / PULLBACK / EXTENDED / DOWNTREND / CHOP |
 | `scanner/watch.py` | Phone alerts: SELL / 2x / warnings / buy ideas via ntfy |
 | `scanner/evening.py` | One-command evening brief → `output/reports/evening_<date>.md` |

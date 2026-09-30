@@ -3,6 +3,8 @@
 Do this for every WATCH token before buying. **Any red flag = skip.** Record the result in the journal `notes` column.
 
 ## 1. Contract safety (red flags are instant skips)
+The scan's **Safety** column runs RugCheck (Solana) and honeypot.is (Base, BNB, Ethereum) for you. FAIL tokens are already dropped. If it says **unchecked** (Monad, or the API was down), do this section by hand. OK only means no *known* trap was found, so still skim the items below.
+
 - [ ] **Mint authority revoked.** On Solana, check with RugCheck, Solscan, or Birdeye. If it isn't revoked, the dev can print more tokens.
 - [ ] **Freeze authority revoked.** If it isn't, the dev can freeze your tokens so you can't sell.
 - [ ] **Liquidity locked or burned.** An unlocked LP can be pulled, which is a rug.

@@ -21,6 +21,7 @@ import urllib.request
 from datetime import datetime, timezone
 
 import chart
+import safety
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 API = "https://api.dexscreener.com"
@@ -193,7 +194,7 @@ def write_outputs(rows, cfg, out_dir, stamp):
     csv_path = os.path.join(out_dir, f"scan_{stamp}.csv")
     fields = ["verdict", "score", "chain", "symbol", "price_usd", "liquidity_usd", "volume_24h_usd",
               "fdv_usd", "age_minutes", "txns_1h", "buy_sell_ratio_1h", "change_1h_pct",
-              "change_24h_pct", "vol_to_liq", "fdv_to_liq", "hype", "chart_trend", "times_seen",
+              "change_24h_pct", "vol_to_liq", "fdv_to_liq", "hype", "safety", "chart_trend", "times_seen",
               "fdv_growth_pct", "token_address", "pair_address", "url", "reasons"]
     with open(csv_path, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
@@ -206,16 +207,17 @@ def write_outputs(rows, cfg, out_dir, stamp):
           f"Pairs screened: **{len(rows)}** · passed filters: **{len(watch)}** · "
           f"rejected: **{len(rows) - len(watch)}**", "",
           "> WATCH = worth researching with docs/RESEARCH_CHECKLIST.md. It is not a buy signal.",
-          "> Best entries: chart = PULLBACK or UPTREND. Skip EXTENDED (chasing) and DOWNTREND.", "",
+          "> Best entries: chart = PULLBACK or UPTREND. Skip EXTENDED (chasing) and DOWNTREND.",
+          "> Safety OK = RugCheck / honeypot.is found no known trap. unchecked = do contract checks by hand.", "",
           "## Watchlist", ""]
     if watch:
-        md += ["| Score | Token | Chain | Chart | Hype | Price | Liquidity | 24h Vol | 1h | 24h | Mcap growth (seen) "
+        md += ["| Score | Token | Chain | Safety | Chart | Hype | Price | Liquidity | 24h Vol | 1h | 24h | Mcap growth (seen) "
                "| Size | Stop | 2x lock-in | Floor after lock |",
-               "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+               "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
         for r in watch:
             p = trade_plan(r, cfg)
             growth = "new" if r.get("fdv_growth_pct") is None else f"{r['fdv_growth_pct']:+.0f}% ({r['times_seen']}x)"
-            md.append(f"| {r['score']} | [{r['symbol']}]({r['url']}) | {chain_label(r, cfg)} | {r.get('chart_trend', 'n/a')} | "
+            md.append(f"| {r['score']} | [{r['symbol']}]({r['url']}) | {chain_label(r, cfg)} | {r.get('safety', 'unchecked')} | {r.get('chart_trend', 'n/a')} | "
                       f"{' '.join(r['hype']) or '-'} | {r['price_usd']:.8g} | "
                       f"${r['liquidity_usd']:,.0f} | ${r['volume_24h_usd']:,.0f} | {r['change_1h_pct']:+.1f}% | "
                       f"{r['change_24h_pct']:+.1f}% | {growth} | ${p['position_usd']} | {p['stop_price']:.8g} | "
@@ -252,7 +254,16 @@ def add_chart(r, candles_fn):
         r["reasons"].append(f"chart {c['trend']}: {c['note']}")
 
 
-def run(pairs, cfg, out_dir, now_ms=None, candles_fn=None, history_path=None):
+def add_safety(r, safety_fn, cfg):
+    res = safety_fn(r["chain"], r["token_address"], cfg.get("safety", {}).get("max_tax_pct", 10))
+    r["safety"] = res["status"]
+    if res["status"] == "FAIL":
+        r["verdict"], r["score"], r["reasons"] = "AVOID", 0, res["notes"]
+    else:
+        r["reasons"].extend(res["notes"])
+
+
+def run(pairs, cfg, out_dir, now_ms=None, candles_fn=None, history_path=None, safety_fn=None):
     now_ms = now_ms or int(time.time() * 1000)
     rows = []
     for p in best_pair_per_token(pairs):
@@ -263,6 +274,10 @@ def run(pairs, cfg, out_dir, now_ms=None, candles_fn=None, history_path=None):
             score += 1
             reasons.append("hype keyword")
         rows.append({**m, "verdict": verdict, "score": score, "reasons": reasons, "hype": hype})
+    if safety_fn:
+        for r in rows:
+            if r["verdict"] == "WATCH" and r["token_address"]:
+                add_safety(r, safety_fn, cfg)
     if candles_fn:
         for r in rows:
             if r["verdict"] == "WATCH" and r["pair_address"]:
@@ -279,17 +294,20 @@ def main():
     ap.add_argument("--fixture", help="JSON file of DexScreener pair objects (offline mode)")
     ap.add_argument("--out", default=os.path.join(ROOT, "output", "scans"))
     ap.add_argument("--no-charts", action="store_true", help="skip GeckoTerminal chart checks")
+    ap.add_argument("--no-safety", action="store_true", help="skip RugCheck / honeypot.is contract checks")
     args = ap.parse_args()
     cfg = load_config()
     if args.fixture:
         with open(args.fixture) as f:
             data = json.load(f)
         pairs, now_ms, candles_fn, history = data["pairs"], data.get("captured_at_ms"), None, None
+        safety_fn = None
     else:
         pairs, now_ms = fetch_candidate_pairs(cfg["chains"], cfg.get("hype_keywords", [])), None
         candles_fn = None if args.no_charts else chart.fetch_candles
+        safety_fn = None if args.no_safety else safety.check
         history = os.path.join(ROOT, "output", "history.csv")
-    rows, (csv_path, md_path) = run(pairs, cfg, args.out, now_ms, candles_fn, history)
+    rows, (csv_path, md_path) = run(pairs, cfg, args.out, now_ms, candles_fn, history, safety_fn)
     print(f"Screened {len(rows)} tokens, {sum(r['verdict'] == 'WATCH' for r in rows)} on watchlist")
     print(f"  {md_path}\n  {csv_path}")
 
