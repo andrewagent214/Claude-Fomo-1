@@ -22,6 +22,12 @@ At $5 per losing trade, you can take about 6 straight losses before hitting the 
 
 Suggestion, not required: at 2x, consider selling half. That takes your original $20 out, so the rest is free money and one trade can't turn a win into a loss.
 
+## Only on 9–10pm PT: what changes
+- For 23 hours a day nobody is watching your coins. Meme coins can drop 50%+ in minutes, so **a stop you only check at 9pm isn't a real stop.** A coin that should have been sold at -25% can be at -70% by the time you look.
+- Best fix: if Fomo lets you set a limit or stop sell, set one at the stop price every night before you log off.
+- If it doesn't, keep new launches (under 24h old) to nights when you can stay on longer. Prefer coins that have been in an uptrend for a day or more.
+- `scanner/evening.py` replays the hourly chart since you bought. If your stop was crossed while you were away, you get a SELL even if the price bounced back.
+
 ## Buy low, sell high: how the chart check works
 (You wrote "buy high, sell low". I'm assuming you meant the opposite. 🙂)
 - **PULLBACK** = dip inside an uptrend (higher lows, down less than 30% from the high). Best entry.

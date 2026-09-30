@@ -32,13 +32,29 @@ flowchart TD
     K -- no --> A
 ```
 
-## Daily routine
+## Evening routine (9–10pm PT)
 
-| When | Command | Output |
-|---|---|---|
-| Each time you check the app | `python3 scanner/positions.py` | `output/reports/positions.md`: HOLD or SELL per coin |
-| Looking for a new trade (max 2 open) | `python3 scanner/scan.py` | `output/scans/scan_<time>.md` watchlist with size, stop, 2x and +30% floor prices |
-| After you sell | add a row to `journal/trades.csv`, then `python3 scanner/stats.py` | `output/reports/performance.md` |
+You're on the app about 9–10pm Pacific, sometimes longer. So the whole routine is **one command**:
+
+```bash
+python3 scanner/evening.py
+```
+
+It writes `output/reports/evening_<date>.md` with:
+1. **Act on these first:** SELL calls, including coins whose stop was **crossed while you were away** (it replays hourly chart closes since you bought, so a dump at 3am still shows up even if the price bounced by 9pm).
+2. **Your coins:** gain, current stop, chart trend.
+3. **New trade ideas:** up to 5 candidates if you have an open slot. Coins under 24h old are flagged ⚠️ because they can rug overnight while you're offline.
+4. **Before you log off:** set a limit sell at each stop price if the app supports it.
+
+| After you… | Do this |
+|---|---|
+| Buy a coin | Add a row to `journal/positions.csv` (`date_opened` like `2026-10-01T21:15-07:00`) |
+| Sell a coin | Delete it from positions, add a row to `journal/trades.csv`, run `python3 scanner/stats.py` |
+| Stay on longer because something is moving | Re-run `python3 scanner/positions.py` every 15–30 min |
+
+**Optional: have the brief ready when you sit down.** On your own computer, schedule it for 8:50pm:
+- Mac/Linux: `crontab -e`, then add `50 20 * * * cd ~/Claude-Fomo-1 && python3 scanner/evening.py` (uses your computer's local time)
+- Windows: Task Scheduler → daily 8:50 PM → `python scanner\evening.py`, start in the repo folder
 
 Each scan also appends to `output/history.csv`. The next scans use it to show how each coin's market cap has grown since it was first seen. That growth record is how "has it kept growing?" gets answered with real numbers.
 
@@ -62,6 +78,7 @@ For an offline demo, run `python3 scanner/scan.py --fixture tests/fixtures/sampl
 | `config.json` | Filters, hype keywords, and risk and exit rules |
 | `scanner/scan.py` | Live screener → `output/scans/`, `output/history.csv` |
 | `scanner/chart.py` | Hourly chart trend: UPTREND / PULLBACK / EXTENDED / DOWNTREND / CHOP |
+| `scanner/evening.py` | One-command evening brief → `output/reports/evening_<date>.md` |
 | `scanner/positions.py` | HOLD/SELL for coins you own → `output/reports/positions.md` |
 | `scanner/stats.py` | Performance from your journal → `output/reports/performance.md` |
 | `journal/positions.csv` | Coins you hold now. `holders` column: append counts from the app like `1200/1350/1500` to track holder growth |

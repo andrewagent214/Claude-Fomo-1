@@ -7,6 +7,9 @@ Rules (from config.json "risk"):
       - entry +30%   (your "never give back below a 30% gain" floor)
       - peak  -35%   (trailing stop, so the floor rises as the coin runs)
     At exactly 2x both equal 1.3x entry; above that the trailing stop takes over.
+  * You're usually only on the app 9-10pm PT, so hourly chart closes since you
+    bought are replayed through these rules. If the stop was crossed while you
+    were away, you get SELL even if the price has since bounced.
   * Warnings (not automatic sells): chart DOWNTREND, sellers outnumbering buyers,
     liquidity or market cap shrinking, holder count falling.
 
@@ -42,6 +45,29 @@ def exit_status(entry, price, peak, risk):
     return ("SELL" if price <= stop else "HOLD"), stop, mode
 
 
+def opened_ms(text):
+    """Parse date_opened (e.g. 2026-10-01 or 2026-10-01T21:15-07:00) to epoch ms, or None."""
+    try:
+        d = datetime.fromisoformat(text.strip())
+    except (AttributeError, ValueError):
+        return None
+    if d.tzinfo is None:
+        d = d.replace(tzinfo=timezone.utc)
+    return int(d.timestamp() * 1000)
+
+
+def replay(entry, peak, candles, since_ms, risk):
+    """Walk hourly closes since the buy. Return (peak, first stop breach as (candle_t, close) or None)."""
+    breach = None
+    for c in candles:
+        if c["t"] * 1000 < since_ms:
+            continue
+        peak = max(peak, c["c"])
+        if breach is None and exit_status(entry, c["c"], peak, risk)[0] == "SELL":
+            breach = (c["t"], c["c"])
+    return peak, breach
+
+
 def warnings(m, trend, holders_now, holders_before):
     w = []
     if trend == "DOWNTREND":
@@ -75,13 +101,22 @@ def check(rows, cfg, pair_fn=fetch_pair, candles_fn=chart.fetch_candles, now_ms=
             continue
         price = m["price_usd"]
         peak = max(float(row.get("peak_price") or entry), price)
-        action, stop, mode = exit_status(entry, price, peak, cfg["risk"])
         try:
-            trend = chart.analyze(candles_fn(row["chain"], row["pair_address"]))["trend"]
+            candles = candles_fn(row["chain"], row["pair_address"])
+            trend = chart.analyze(candles)["trend"]
         except Exception:
-            trend = "n/a"
+            candles, trend = [], "n/a"
+        since = opened_ms(row.get("date_opened"))
+        breach = None
+        if candles and since:
+            peak, breach = replay(entry, peak, candles, since, cfg["risk"])
+        action, stop, mode = exit_status(entry, price, peak, cfg["risk"])
         holders = [int(h) for h in (row.get("holders") or "").split("/") if h.strip().isdigit()]
         warn = warnings(m, trend, holders[-1] if holders else None, holders[-2] if len(holders) > 1 else None)
+        if breach and action == "HOLD":
+            action = "SELL"
+            when = datetime.fromtimestamp(breach[0], timezone.utc).strftime("%m-%d %H:00 UTC")
+            warn.insert(0, f"stop was crossed while you were away ({when}, close {breach[1]:.8g})")
         row["peak_price"] = f"{peak:.10g}"
         results.append({"token": row["token"], "entry": entry, "price": price, "peak": peak, "size": size,
                         "value": size * price / entry, "gain_pct": (price / entry - 1) * 100,
@@ -110,8 +145,8 @@ def report(results, cfg):
     return "\n".join(lines) + "\n"
 
 
-def main():
-    cfg = scan.load_config()
+def run(cfg):
+    """Check journal/positions.csv, save updated peaks, write the report. Returns (results, report_path)."""
     with open(POSITIONS) as f:
         reader = csv.DictReader(f)
         fields, rows = reader.fieldnames, list(reader)
@@ -125,6 +160,11 @@ def main():
     path = os.path.join(out, "positions.md")
     with open(path, "w") as f:
         f.write(report(results, cfg))
+    return results, path
+
+
+def main():
+    results, path = run(scan.load_config())
     for x in results:
         print(f"{x['action']:4} {x['token']}: {x['gain_pct']:+.1f}%  stop {x['stop']:.8g}  {'; '.join(x['warnings'])}")
     print(path)

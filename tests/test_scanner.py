@@ -8,6 +8,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "scanner"))
 
 import chart  # noqa: E402
+import evening  # noqa: E402
 import positions  # noqa: E402
 import scan  # noqa: E402
 import stats  # noqa: E402
@@ -90,6 +91,40 @@ class ExitRuleTest(unittest.TestCase):
         self.assertEqual(res[0]["action"], "SELL")  # 1.2 < 1.3 floor
         self.assertIn("holders falling 500->450", res[0]["warnings"])
         self.assertEqual(rows[0]["peak_price"], "2.2")
+
+
+class AwayTest(unittest.TestCase):
+    cfg = scan.load_config()
+
+    def test_stop_crossed_while_away(self):
+        # bought at 1.0 at hour 10, spiked to 2.0, dumped to 1.2 (below +30% floor), bounced to 1.4
+        closes = [1.0] * 10 + [1.5, 2.0, 1.6, 1.2, 1.4] + [1.4] * 20
+        rows = [{"token": "X", "chain": "solana", "pair_address": "p", "entry_price": "1", "size_usd": "20",
+                 "peak_price": "1", "holders": "", "date_opened": "1970-01-01T10:00:00+00:00"}]
+        pair = {"priceUsd": "1.4", "txns": {"h1": {"buys": 30, "sells": 10}}, "liquidity": {"usd": 1}}
+        res = positions.check(rows, self.cfg, lambda c, a: pair,
+                              lambda c, a: [dict(x, t=x["t"] * 3600) for x in candles(closes)], 0)
+        self.assertEqual(res[0]["action"], "SELL")
+        self.assertIn("while you were away", res[0]["warnings"][0])
+        self.assertEqual(rows[0]["peak_price"], "2")
+
+    def test_opened_ms(self):
+        self.assertEqual(positions.opened_ms("1970-01-01"), 0)
+        self.assertIsNone(positions.opened_ms("yesterday"))
+
+    def test_brief_renders(self):
+        held = [{"token": "X", "action": "HOLD", "gain_pct": 10, "price": 1.1, "stop": 0.75, "mode": "INITIAL STOP",
+                 "trend": "UPTREND", "warnings": [], "value": 22, "size": 20}]
+        acct = {"realized": -5, "cash_basis": 45, "today": 0, "halted": False, "day_halted": False}
+        watch = [{"score": 5, "symbol": "NEW", "url": "u", "chart_trend": "PULLBACK", "hype": ["trump"],
+                  "age_minutes": 120, "change_1h_pct": 3, "change_24h_pct": 40, "price_usd": 1.0}]
+        text = evening.brief(self.cfg, held, acct, watch)
+        self.assertIn("Nothing to sell", text)
+        self.assertIn("NEW", text)
+        self.assertIn("under 24h old", text)
+        halted = evening.brief(self.cfg, held, dict(acct, halted=True), watch)
+        self.assertIn("loss limit reached", halted)
+        self.assertIn("Skipped: loss limit hit", halted)
 
 
 class StatsTest(unittest.TestCase):
