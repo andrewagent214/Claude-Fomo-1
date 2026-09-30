@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Screen newly-promoted meme coins using public DexScreener market data.
+"""Screen newly-promoted and hype-keyword meme coins using public market data.
 
 This does NOT predict price. It applies hard safety filters and a simple
 momentum score so you only spend research time on tokens that pass basic
@@ -16,8 +16,11 @@ import json
 import os
 import sys
 import time
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
+
+import chart
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 API = "https://api.dexscreener.com"
@@ -34,15 +37,19 @@ def get_json(url):
         return json.load(resp)
 
 
-def fetch_candidate_pairs(chains):
-    """Latest token profiles + top boosted tokens -> their trading pairs."""
+def fetch_candidate_pairs(chains, keywords=()):
+    """Latest token profiles + top boosted tokens + keyword searches -> trading pairs."""
+    pairs = []
+    for kw in keywords:
+        found = get_json(f"{API}/latest/dex/search?q={urllib.parse.quote(kw)}").get("pairs") or []
+        pairs.extend(p for p in found if p.get("chainId") in chains)
+        time.sleep(0.25)
     tokens = {}
     for endpoint in ("/token-profiles/latest/v1", "/token-boosts/top/v1"):
         for item in get_json(API + endpoint):
             if item.get("chainId") in chains:
                 tokens.setdefault(item["chainId"], set()).add(item["tokenAddress"])
 
-    pairs = []
     for chain, addrs in tokens.items():
         addrs = sorted(addrs)
         for i in range(0, len(addrs), 30):  # API accepts up to 30 addresses per call
@@ -62,6 +69,11 @@ def best_pair_per_token(pairs):
     return list(best.values())
 
 
+def hype_match(p, keywords):
+    text = f"{p.get('baseToken', {}).get('name', '')} {p.get('baseToken', {}).get('symbol', '')}".lower()
+    return [k for k in keywords if k in text]
+
+
 def metrics(p, now_ms):
     txns_1h = (p.get("txns") or {}).get("h1") or {}
     buys, sells = txns_1h.get("buys", 0), txns_1h.get("sells", 0)
@@ -75,6 +87,7 @@ def metrics(p, now_ms):
         "name": p.get("baseToken", {}).get("name"),
         "token_address": p.get("baseToken", {}).get("address"),
         "dex": p.get("dexId"),
+        "pair_address": p.get("pairAddress"),
         "url": p.get("url"),
         "price_usd": float(p.get("priceUsd") or 0),
         "liquidity_usd": liq,
@@ -136,8 +149,38 @@ def trade_plan(m, cfg):
     return {
         "position_usd": round(size, 2),
         "stop_price": price * (1 - r["stop_loss_pct"] / 100),
-        "take_profits": [price * (1 + t / 100) for t in r["take_profit_tiers_pct"]],
+        "lock_in_price": price * r["lock_in_trigger_multiple"],
+        "floor_price": price * (1 + r["lock_in_floor_gain_pct"] / 100),
     }
+
+
+HISTORY_FIELDS = ["captured_at", "chain", "token_address", "symbol", "price_usd", "fdv_usd",
+                  "liquidity_usd", "volume_24h_usd", "txns_1h", "buy_sell_ratio_1h"]
+
+
+def update_history(rows, path, stamp):
+    """Append this scan to the history file and attach growth since first seen."""
+    first = {}
+    if os.path.exists(path):
+        with open(path) as f:
+            for h in csv.DictReader(f):
+                key = (h["chain"], h["token_address"])
+                if key not in first:
+                    first[key] = {**h, "scans": 0}
+                first[key]["scans"] += 1
+    new = not os.path.exists(path)
+    with open(path, "a", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=HISTORY_FIELDS, extrasaction="ignore")
+        if new:
+            w.writeheader()
+        for r in rows:
+            w.writerow({**r, "captured_at": stamp})
+    for r in rows:
+        h = first.get((r["chain"], r["token_address"]))
+        r["times_seen"] = (h["scans"] if h else 0) + 1
+        r["first_seen"] = h["captured_at"] if h else stamp
+        old_fdv = float(h["fdv_usd"]) if h and h["fdv_usd"] else 0
+        r["fdv_growth_pct"] = (r["fdv_usd"] / old_fdv - 1) * 100 if old_fdv else None
 
 
 def write_outputs(rows, cfg, out_dir, stamp):
@@ -145,28 +188,36 @@ def write_outputs(rows, cfg, out_dir, stamp):
     csv_path = os.path.join(out_dir, f"scan_{stamp}.csv")
     fields = ["verdict", "score", "chain", "symbol", "price_usd", "liquidity_usd", "volume_24h_usd",
               "fdv_usd", "age_minutes", "txns_1h", "buy_sell_ratio_1h", "change_1h_pct",
-              "change_24h_pct", "vol_to_liq", "fdv_to_liq", "token_address", "url", "reasons"]
+              "change_24h_pct", "vol_to_liq", "fdv_to_liq", "hype", "chart_trend", "times_seen",
+              "fdv_growth_pct", "token_address", "pair_address", "url", "reasons"]
     with open(csv_path, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
         w.writeheader()
         for r in rows:
-            w.writerow({**r, "reasons": "; ".join(r["reasons"])})
+            w.writerow({**r, "reasons": "; ".join(r["reasons"]), "hype": " ".join(r["hype"])})
 
     watch = [r for r in rows if r["verdict"] == "WATCH"]
     md = [f"# Scan {stamp}", "",
           f"Pairs screened: **{len(rows)}** · passed filters: **{len(watch)}** · "
           f"rejected: **{len(rows) - len(watch)}**", "",
-          "> WATCH = worth researching with docs/RESEARCH_CHECKLIST.md. It is not a buy signal.", "",
+          "> WATCH = worth researching with docs/RESEARCH_CHECKLIST.md. It is not a buy signal.",
+          "> Best entries: chart = PULLBACK or UPTREND. Skip EXTENDED (chasing) and DOWNTREND.", "",
           "## Watchlist", ""]
     if watch:
-        md += ["| Score | Token | Chain | Price | Liquidity | 24h Vol | 1h | 24h | Size | Stop | TP1 / TP2 / TP3 |",
-               "|---|---|---|---|---|---|---|---|---|---|---|"]
+        md += ["| Score | Token | Chain | Chart | Hype | Price | Liquidity | 24h Vol | 1h | 24h | Mcap growth (seen) "
+               "| Size | Stop | 2x lock-in | Floor after lock |",
+               "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
         for r in watch:
             p = trade_plan(r, cfg)
-            tps = " / ".join(f"{t:.8g}" for t in p["take_profits"])
-            md.append(f"| {r['score']}/4 | [{r['symbol']}]({r['url']}) | {r['chain']} | {r['price_usd']:.8g} | "
+            growth = "new" if r.get("fdv_growth_pct") is None else f"{r['fdv_growth_pct']:+.0f}% ({r['times_seen']}x)"
+            md.append(f"| {r['score']} | [{r['symbol']}]({r['url']}) | {r['chain']} | {r.get('chart_trend', 'n/a')} | "
+                      f"{' '.join(r['hype']) or '-'} | {r['price_usd']:.8g} | "
                       f"${r['liquidity_usd']:,.0f} | ${r['volume_24h_usd']:,.0f} | {r['change_1h_pct']:+.1f}% | "
-                      f"{r['change_24h_pct']:+.1f}% | ${p['position_usd']} | {p['stop_price']:.8g} | {tps} |")
+                      f"{r['change_24h_pct']:+.1f}% | {growth} | ${p['position_usd']} | {p['stop_price']:.8g} | "
+                      f"{p['lock_in_price']:.8g} | {p['floor_price']:.8g} |")
+        if any(r["hype"] for r in watch):
+            md += ["", "> **Hype-keyword tokens:** a Trump/Elon name does NOT mean Trump or Elon is involved. "
+                   "Almost all are unofficial. Only trust a contract address posted by the person's verified account."]
     else:
         md.append("Nothing passed the filters. Not trading is a valid outcome.")
     md += ["", "## Rejected (top reasons)", ""]
@@ -178,15 +229,40 @@ def write_outputs(rows, cfg, out_dir, stamp):
     return csv_path, md_path
 
 
-def run(pairs, cfg, out_dir, now_ms=None):
+def add_chart(r, candles_fn):
+    try:
+        c = chart.analyze(candles_fn(r["chain"], r["pair_address"]))
+    except Exception as e:  # chart data is a bonus, never block the scan
+        r["chart_trend"] = f"n/a ({type(e).__name__})"
+        return
+    r["chart_trend"] = c["trend"]
+    if c["trend"] in ("PULLBACK", "UPTREND"):
+        r["score"] += 1
+        r["reasons"].append(f"chart {c['trend']}")
+    elif c["trend"] in ("DOWNTREND", "EXTENDED"):
+        r["score"] -= 1
+        r["reasons"].append(f"chart {c['trend']}: {c['note']}")
+
+
+def run(pairs, cfg, out_dir, now_ms=None, candles_fn=None, history_path=None):
     now_ms = now_ms or int(time.time() * 1000)
     rows = []
     for p in best_pair_per_token(pairs):
         m = metrics(p, now_ms)
         verdict, score, reasons = evaluate(m, cfg)
-        rows.append({**m, "verdict": verdict, "score": score, "reasons": reasons})
+        hype = hype_match(p, cfg.get("hype_keywords", []))
+        if hype and verdict == "WATCH":
+            score += 1
+            reasons.append("hype keyword")
+        rows.append({**m, "verdict": verdict, "score": score, "reasons": reasons, "hype": hype})
+    if candles_fn:
+        for r in rows:
+            if r["verdict"] == "WATCH" and r["pair_address"]:
+                add_chart(r, candles_fn)
     rows.sort(key=lambda r: (r["verdict"] != "WATCH", -r["score"], -r["liquidity_usd"]))
     stamp = datetime.fromtimestamp(now_ms / 1000, timezone.utc).strftime("%Y%m%d_%H%M%SZ")
+    if history_path:
+        update_history(rows, history_path, stamp)
     return rows, write_outputs(rows, cfg, out_dir, stamp)
 
 
@@ -194,15 +270,18 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--fixture", help="JSON file of DexScreener pair objects (offline mode)")
     ap.add_argument("--out", default=os.path.join(ROOT, "output", "scans"))
+    ap.add_argument("--no-charts", action="store_true", help="skip GeckoTerminal chart checks")
     args = ap.parse_args()
     cfg = load_config()
     if args.fixture:
         with open(args.fixture) as f:
             data = json.load(f)
-        pairs, now_ms = data["pairs"], data.get("captured_at_ms")
+        pairs, now_ms, candles_fn, history = data["pairs"], data.get("captured_at_ms"), None, None
     else:
-        pairs, now_ms = fetch_candidate_pairs(cfg["chains"]), None
-    rows, (csv_path, md_path) = run(pairs, cfg, args.out, now_ms)
+        pairs, now_ms = fetch_candidate_pairs(cfg["chains"], cfg.get("hype_keywords", [])), None
+        candles_fn = None if args.no_charts else chart.fetch_candles
+        history = os.path.join(ROOT, "output", "history.csv")
+    rows, (csv_path, md_path) = run(pairs, cfg, args.out, now_ms, candles_fn, history)
     print(f"Screened {len(rows)} tokens, {sum(r['verdict'] == 'WATCH' for r in rows)} on watchlist")
     print(f"  {md_path}\n  {csv_path}")
 

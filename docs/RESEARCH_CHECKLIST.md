@@ -17,7 +17,7 @@ Do this for every WATCH token before buying. **Any red flag = skip.** Record the
 ## 3. Market structure (from the scan report)
 - [ ] Liquidity ≥ the config minimum, and your position is **< 2% of pool liquidity** so you can get out.
 - [ ] 1h buys ≥ sells, and volume isn't just a few wallets wash-trading.
-- [ ] Not already up hundreds of percent today. Late entries are the most common way to become exit liquidity.
+- [ ] Chart check is PULLBACK or UPTREND, not EXTENDED. Late entries into vertical pumps are how buyers become exit liquidity.
 - [ ] Chart: entering on a pullback or consolidation, not a vertical green candle.
 
 ## 4. Narrative & socials
@@ -26,7 +26,12 @@ Do this for every WATCH token before buying. **Any red flag = skip.** Record the
 - [ ] Dev or team history: past launches that rugged?
 
 ## 5. The plan (write it down before you click buy)
-- [ ] Position size from the scan report (risk $ ÷ stop %)
+- [ ] Position size from the scan report ($20 with the current config)
 - [ ] Stop price
-- [ ] TP1 / TP2 / TP3 and how much to sell at each
+- [ ] 2x lock-in price and the +30% floor price (from the scan report)
 - [ ] You're under the max open positions and haven't hit today's loss limit
+
+## 6. Trump / Elon / celebrity coins (extra checks)
+- [ ] The contract address came from the person's **verified** account or official site, not a reply, DM, or group chat.
+- [ ] It's the same contract address the Fomo app shows. Copycats use the same name and ticker.
+- [ ] You aren't buying in the first minutes after a post, when bots have already front-run the pump.

@@ -1,25 +1,17 @@
-# Setup Questions
+# Setup Questions: your answers (Sept 2026)
 
-Your answers set `config.json` and decide which setups we track. Answer inline and commit, or reply in chat.
+| Question | Your answer | Set in |
+|---|---|---|
+| Capital | $50 to start, more later | `risk.account_size_usd` |
+| Max loss | $30 total | `risk.total_loss_limit_usd` |
+| Goal | $100 | `risk.goal_usd` |
+| Hold time | As long as growth + hype continue | trailing stop, `risk.trail_from_peak_pct` |
+| New launches? | Yes, if big hype/upside; also older coins with steady growth | `filters.min_age_minutes` = 15, `max_age_days` = 365 |
+| After 2x | Stay in, never drop below +30% | `risk.lock_in_*` |
+| Follow | Trump, Elon, top Fomo trader | `hype_keywords`; trader tracker waiting on a wallet address |
+| Past trades | None yet | journal starts empty |
 
-## Money & risk
-1. How much capital is in the Fomo account for this, and how much are you truly OK losing entirely?
-2. Max loss per trade you'd accept: 1% of account, 2%, or a fixed $ amount?
-3. Daily loss limit that makes you stop for the day?
-
-## Style & time
-4. How long do you want to hold? Minutes (scalps), hours (intraday), or days (swing)?
-5. How many hours a day can you watch the screen? Can you react to alerts during the day?
-6. Do you want to catch brand-new launches (highest risk and reward), or only tokens with some history (hours to days old, more liquidity)?
-
-## Market
-7. Which chains does your Fomo account trade: Solana, Base, others?
-8. Any coins or narratives you already follow (AI agents, animals, political, celebrity, etc.)?
-9. Any accounts or KOLs you follow for calls? (We'll track whether their calls actually make money.)
-
-## History
-10. Do you have past trades we can load into `journal/trades.csv` for a baseline? A Fomo trade-history export or screenshots work.
-11. What went wrong on your worst trades: bought the top, held too long, got rugged, or oversized?
-
-## Exits
-12. When a coin 2x's, do you prefer taking profits in thirds (the current default) or selling your initial and riding the rest?
+## Still open
+1. Which chains does your Fomo account trade: Solana only, or Base too?
+2. Wallet address(es) of the top Fomo trader(s) you want to follow.
+3. Your time zone and when you can check the app, so scans and position checks run at those times.

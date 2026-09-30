@@ -11,51 +11,68 @@ It gives you three things:
 
 ## Workflow
 
+Your plan: **$50 → $100, max loss $30.** Full rules are in [`docs/STRATEGY.md`](docs/STRATEGY.md).
+
 ```mermaid
 flowchart TD
-    A[1. Scan<br/>python3 scanner/scan.py] --> B{Passes hard filters?<br/>liquidity, volume, age,<br/>not already pumped}
-    B -- no --> X[AVOID - logged with reason]
-    B -- yes --> C[2. Watchlist<br/>output/scans/scan_*.md]
-    C --> D[3. Manual research<br/>docs/RESEARCH_CHECKLIST.md]
-    D --> E{All red-flag checks clear?}
-    E -- no --> X
-    E -- yes --> F[4. Plan<br/>size = risk$ / stop%<br/>stop + TP tiers from config.json]
-    F --> G[5. Execute in Fomo app<br/>you press the button]
-    G --> H[6. Manage<br/>sell 1/3 at each TP, full exit at stop]
-    H --> I[7. Journal<br/>journal/trades.csv]
+    A[1. Scan<br/>python3 scanner/scan.py<br/>new launches + trending + Trump/Elon keywords] --> B{Safety filters<br/>liquidity, volume, age,<br/>not already +1000%}
+    B -- fail --> X[AVOID - reason logged]
+    B -- pass --> C[2. Chart check<br/>PULLBACK / UPTREND = ok<br/>EXTENDED / DOWNTREND = skip]
+    C --> D[3. Watchlist<br/>output/scans/scan_*.md]
+    D --> E[4. Manual research<br/>docs/RESEARCH_CHECKLIST.md<br/>verify contract is real]
+    E -- red flag --> X
+    E -- clear --> F[5. Buy $20 in Fomo app<br/>add row to journal/positions.csv]
+    F --> G[6. Monitor<br/>python3 scanner/positions.py]
+    G --> H{Price vs stop}
+    H -- above stop --> G
+    H -- "at/below stop:<br/>-25% before 2x<br/>+30% floor / 35% trail after 2x" --> I[7. SELL in Fomo app<br/>move row to journal/trades.csv]
     I --> J[8. Review<br/>python3 scanner/stats.py]
-    J --> K{30+ trades?<br/>positive expectancy?}
-    K -- not yet --> A
-    K -- tune rules --> L[Adjust config.json<br/>one change at a time]
-    L --> A
+    J --> K{Account ≤ $20?}
+    K -- yes --> STOP[Stop and review with Claude]
+    K -- no --> A
 ```
+
+## Daily routine
+
+| When | Command | Output |
+|---|---|---|
+| Each time you check the app | `python3 scanner/positions.py` | `output/reports/positions.md`: HOLD or SELL per coin |
+| Looking for a new trade (max 2 open) | `python3 scanner/scan.py` | `output/scans/scan_<time>.md` watchlist with size, stop, 2x and +30% floor prices |
+| After you sell | add a row to `journal/trades.csv`, then `python3 scanner/stats.py` | `output/reports/performance.md` |
+
+Each scan also appends to `output/history.csv`. The next scans use it to show how each coin's market cap has grown since it was first seen. That growth record is how "has it kept growing?" gets answered with real numbers.
 
 ## Quick start
 
 ```bash
-python3 scanner/scan.py          # live scan -> output/scans/scan_<time>.md + .csv
-python3 scanner/stats.py         # journal -> output/reports/performance.md
+python3 scanner/scan.py                      # live scan (add --no-charts to skip chart checks)
+python3 scanner/chart.py solana <pair_addr>  # chart read for one coin
+python3 scanner/positions.py                 # HOLD/SELL on what you own
+python3 scanner/stats.py                     # your real performance
 python3 -m unittest discover -s tests
 ```
 
-It needs only the Python 3 standard library. The live scan needs internet access to `api.dexscreener.com`.
-To test offline, run `python3 scanner/scan.py --fixture tests/fixtures/sample_pairs.json`. That file holds synthetic test data.
+It needs only the Python 3 standard library. The live commands need internet access to `api.dexscreener.com` and `api.geckoterminal.com`.
+For an offline demo, run `python3 scanner/scan.py --fixture tests/fixtures/sample_pairs.json`. That file holds synthetic test data.
 
 ## Folder layout
 
 | Path | Purpose |
 |---|---|
-| `config.json` | Filters, scoring, and risk rules (account size, risk per trade, stop, TP tiers, daily loss limit) |
-| `scanner/scan.py` | Live screener → `output/scans/` |
-| `scanner/stats.py` | Performance report from your journal → `output/reports/` |
-| `journal/trades.csv` | One row per closed trade (you fill it in) |
-| `docs/RESEARCH_CHECKLIST.md` | Checks to run before every entry |
-| `docs/QUESTIONS.md` | Setup questions I need answered before tuning the system |
-| `output/` | All generated reports |
+| `config.json` | Filters, hype keywords, and risk and exit rules |
+| `scanner/scan.py` | Live screener → `output/scans/`, `output/history.csv` |
+| `scanner/chart.py` | Hourly chart trend: UPTREND / PULLBACK / EXTENDED / DOWNTREND / CHOP |
+| `scanner/positions.py` | HOLD/SELL for coins you own → `output/reports/positions.md` |
+| `scanner/stats.py` | Performance from your journal → `output/reports/performance.md` |
+| `journal/positions.csv` | Coins you hold now. `holders` column: append counts from the app like `1200/1350/1500` to track holder growth |
+| `journal/trades.csv` | One row per closed trade |
+| `docs/STRATEGY.md` | Your $50 → $100 plan, exit rules, the realistic picture on Trump/Elon coins |
+| `docs/RESEARCH_CHECKLIST.md` | Checks before every buy |
+| `docs/QUESTIONS.md` | Your answers + open questions |
 
 ## Where the numbers come from
 
-- Scanner figures are the raw DexScreener API values at scan time: price, liquidity, volume, transaction counts, price change, FDV, and pair age. Nothing is estimated.
+- Scanner and position figures are the raw DexScreener and GeckoTerminal API values at scan time: price, liquidity, volume, transaction counts, price change, FDV, and pair age. Nothing is estimated.
 - Performance figures come only from trades you log. Treat anything under about 30 trades as noise.
 - The thresholds in `config.json` are **starting assumptions, not proven edges**. Change them only when your journal stats justify it.
 

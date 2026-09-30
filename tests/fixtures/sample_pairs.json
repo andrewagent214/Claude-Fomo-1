@@ -87,7 +87,7 @@
     "usd": 90000
    },
    "fdv": 1000000,
-   "pairCreatedAt": 1789998800000
+   "pairCreatedAt": 1789999400000
   },
   {
    "chainId": "solana",
@@ -110,7 +110,7 @@
    },
    "priceChange": {
     "h1": -2,
-    "h24": 900
+    "h24": 2500
    },
    "liquidity": {
     "usd": 120000
@@ -143,6 +143,35 @@
    },
    "liquidity": {
     "usd": 20000
+   },
+   "fdv": 2000000,
+   "pairCreatedAt": 1789964000000
+  },
+  {
+   "chainId": "solana",
+   "dexId": "raydium",
+   "url": "https://dexscreener.com/solana/gooda",
+   "baseToken": {
+    "address": "TCaddr",
+    "name": "Trump Cat",
+    "symbol": "TRUMPCAT"
+   },
+   "priceUsd": "0.00123",
+   "txns": {
+    "h1": {
+     "buys": 300,
+     "sells": 200
+    }
+   },
+   "volume": {
+    "h24": 400000
+   },
+   "priceChange": {
+    "h1": 5,
+    "h24": 80
+   },
+   "liquidity": {
+    "usd": 150000
    },
    "fdv": 2000000,
    "pairCreatedAt": 1789964000000
