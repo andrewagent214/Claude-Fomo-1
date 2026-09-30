@@ -1,0 +1,62 @@
+{
+  "_comment": "Tuned to your answers (Sept 2026). Thresholds are starting assumptions, not proven edges. Change them only when journal stats (python3 scanner/stats.py) justify it.",
+  "chains": [
+    "solana",
+    "base",
+    "bsc",
+    "ethereum",
+    "monad"
+  ],
+  "filters": {
+    "min_liquidity_usd": 20000,
+    "min_volume_24h_usd": 50000,
+    "min_age_minutes": 15,
+    "max_age_days": 365,
+    "min_txns_1h": 100,
+    "max_price_change_24h_pct": 1000,
+    "max_fdv_to_liquidity": 50
+  },
+  "scoring": {
+    "buy_sell_ratio_1h_good": 1.2,
+    "volume_to_liquidity_good": 1.0,
+    "volume_to_liquidity_too_hot": 30.0
+  },
+  "hype_keywords": [
+    "trump",
+    "maga",
+    "melania",
+    "barron",
+    "elon",
+    "musk",
+    "doge",
+    "grok",
+    "x.ai",
+    "tesla",
+    "spacex"
+  ],
+  "risk": {
+    "account_size_usd": 50,
+    "total_loss_limit_usd": 30,
+    "goal_usd": 100,
+    "max_risk_per_trade_pct": 10.0,
+    "stop_loss_pct": 25,
+    "max_open_positions": 2,
+    "daily_loss_limit_usd": 10,
+    "lock_in_trigger_multiple": 2.0,
+    "lock_in_floor_gain_pct": 30,
+    "trail_from_peak_pct": 35
+  },
+  "high_gas_chains": [
+    "ethereum"
+  ],
+  "alerts": {
+    "ntfy_topic": "",
+    "check_positions_minutes": 5,
+    "scan_minutes": 30,
+    "min_buy_score": 5,
+    "buy_alert_hours_pt": [
+      7,
+      23
+    ]
+  }
+}
