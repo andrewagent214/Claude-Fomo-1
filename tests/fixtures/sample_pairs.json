@@ -1,0 +1,151 @@
+{
+ "_comment": "SYNTHETIC test data for unit tests only. Not real tokens or market data.",
+ "captured_at_ms": 1790000000000,
+ "pairs": [
+  {
+   "chainId": "solana",
+   "dexId": "raydium",
+   "url": "https://dexscreener.com/solana/gooda",
+   "baseToken": {
+    "address": "GOODAaddr",
+    "name": "GOODA",
+    "symbol": "GOODA"
+   },
+   "priceUsd": "0.00123",
+   "txns": {
+    "h1": {
+     "buys": 300,
+     "sells": 200
+    }
+   },
+   "volume": {
+    "h24": 400000
+   },
+   "priceChange": {
+    "h1": 5,
+    "h24": 80
+   },
+   "liquidity": {
+    "usd": 150000
+   },
+   "fdv": 2000000,
+   "pairCreatedAt": 1789964000000
+  },
+  {
+   "chainId": "solana",
+   "dexId": "raydium",
+   "url": "https://dexscreener.com/solana/thinlq",
+   "baseToken": {
+    "address": "THINLQaddr",
+    "name": "THINLQ",
+    "symbol": "THINLQ"
+   },
+   "priceUsd": "0.00123",
+   "txns": {
+    "h1": {
+     "buys": 150,
+     "sells": 100
+    }
+   },
+   "volume": {
+    "h24": 90000
+   },
+   "priceChange": {
+    "h1": 10,
+    "h24": 40
+   },
+   "liquidity": {
+    "usd": 8000
+   },
+   "fdv": 900000,
+   "pairCreatedAt": 1789982000000
+  },
+  {
+   "chainId": "solana",
+   "dexId": "raydium",
+   "url": "https://dexscreener.com/solana/baby",
+   "baseToken": {
+    "address": "BABYaddr",
+    "name": "BABY",
+    "symbol": "BABY"
+   },
+   "priceUsd": "0.00123",
+   "txns": {
+    "h1": {
+     "buys": 400,
+     "sells": 100
+    }
+   },
+   "volume": {
+    "h24": 300000
+   },
+   "priceChange": {
+    "h1": 20,
+    "h24": 50
+   },
+   "liquidity": {
+    "usd": 90000
+   },
+   "fdv": 1000000,
+   "pairCreatedAt": 1789998800000
+  },
+  {
+   "chainId": "solana",
+   "dexId": "raydium",
+   "url": "https://dexscreener.com/solana/pumped",
+   "baseToken": {
+    "address": "PUMPEDaddr",
+    "name": "PUMPED",
+    "symbol": "PUMPED"
+   },
+   "priceUsd": "0.00123",
+   "txns": {
+    "h1": {
+     "buys": 300,
+     "sells": 300
+    }
+   },
+   "volume": {
+    "h24": 900000
+   },
+   "priceChange": {
+    "h1": -2,
+    "h24": 900
+   },
+   "liquidity": {
+    "usd": 120000
+   },
+   "fdv": 3000000,
+   "pairCreatedAt": 1789946000000
+  },
+  {
+   "chainId": "solana",
+   "dexId": "raydium",
+   "url": "https://dexscreener.com/solana/gooda",
+   "baseToken": {
+    "address": "GOODAaddr",
+    "name": "GOODA",
+    "symbol": "GOODA"
+   },
+   "priceUsd": "0.00123",
+   "txns": {
+    "h1": {
+     "buys": 10,
+     "sells": 10
+    }
+   },
+   "volume": {
+    "h24": 5000
+   },
+   "priceChange": {
+    "h1": 0,
+    "h24": 0
+   },
+   "liquidity": {
+    "usd": 20000
+   },
+   "fdv": 2000000,
+   "pairCreatedAt": 1789964000000
+  }
+ ]
+}
