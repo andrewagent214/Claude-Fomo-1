@@ -140,6 +140,11 @@ def evaluate(m, cfg):
     return "WATCH", score, reasons
 
 
+def chain_label(r, cfg):
+    """Chain name, with a gas warning where fees eat into a $20 trade."""
+    return r["chain"] + (" ⛽" if r["chain"] in cfg.get("high_gas_chains", []) else "")
+
+
 def trade_plan(m, cfg):
     """Position size and exit levels derived from config risk rules."""
     r = cfg["risk"]
@@ -210,11 +215,14 @@ def write_outputs(rows, cfg, out_dir, stamp):
         for r in watch:
             p = trade_plan(r, cfg)
             growth = "new" if r.get("fdv_growth_pct") is None else f"{r['fdv_growth_pct']:+.0f}% ({r['times_seen']}x)"
-            md.append(f"| {r['score']} | [{r['symbol']}]({r['url']}) | {r['chain']} | {r.get('chart_trend', 'n/a')} | "
+            md.append(f"| {r['score']} | [{r['symbol']}]({r['url']}) | {chain_label(r, cfg)} | {r.get('chart_trend', 'n/a')} | "
                       f"{' '.join(r['hype']) or '-'} | {r['price_usd']:.8g} | "
                       f"${r['liquidity_usd']:,.0f} | ${r['volume_24h_usd']:,.0f} | {r['change_1h_pct']:+.1f}% | "
                       f"{r['change_24h_pct']:+.1f}% | {growth} | ${p['position_usd']} | {p['stop_price']:.8g} | "
                       f"{p['lock_in_price']:.8g} | {p['floor_price']:.8g} |")
+        if any(r["chain"] in cfg.get("high_gas_chains", []) for r in watch):
+            md += ["", "> ⛽ = network fees can be several dollars per swap, a big bite out of a $20 trade. Check the fee "
+                   "Fomo quotes before buying."]
         if any(r["hype"] for r in watch):
             md += ["", "> **Hype-keyword tokens:** a Trump/Elon name does NOT mean Trump or Elon is involved. "
                    "Almost all are unofficial. Only trust a contract address posted by the person's verified account."]

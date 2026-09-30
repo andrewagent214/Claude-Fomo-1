@@ -1,3 +1,4 @@
 __pycache__/
 output/scans/scan_*
 output/reports/*.md
+output/alert_state.json

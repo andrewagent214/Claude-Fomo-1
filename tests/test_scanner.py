@@ -12,6 +12,7 @@ import evening  # noqa: E402
 import positions  # noqa: E402
 import scan  # noqa: E402
 import stats  # noqa: E402
+import watch  # noqa: E402
 
 
 class ScanTest(unittest.TestCase):
@@ -116,7 +117,7 @@ class AwayTest(unittest.TestCase):
         held = [{"token": "X", "action": "HOLD", "gain_pct": 10, "price": 1.1, "stop": 0.75, "mode": "INITIAL STOP",
                  "trend": "UPTREND", "warnings": [], "value": 22, "size": 20}]
         acct = {"realized": -5, "cash_basis": 45, "today": 0, "halted": False, "day_halted": False}
-        watch = [{"score": 5, "symbol": "NEW", "url": "u", "chart_trend": "PULLBACK", "hype": ["trump"],
+        watch = [{"score": 5, "symbol": "NEW", "url": "u", "chain": "ethereum", "chart_trend": "PULLBACK", "hype": ["trump"],
                   "age_minutes": 120, "change_1h_pct": 3, "change_24h_pct": 40, "price_usd": 1.0}]
         text = evening.brief(self.cfg, held, acct, watch)
         self.assertIn("Nothing to sell", text)
@@ -139,3 +140,45 @@ class StatsTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WatchTest(unittest.TestCase):
+    def setUp(self):
+        self.cfg = json.loads(json.dumps(scan.load_config()))
+        self.cfg["alerts"]["ntfy_topic"] = "test"
+        self.sent = []
+        self._orig = (watch.send, watch.positions.run, watch.evening.account_status)
+        watch.send = lambda topic, title, msg, *a: self.sent.append(title)
+        watch.evening.account_status = lambda cfg: {"halted": False, "day_halted": False}
+
+    def tearDown(self):
+        watch.send, watch.positions.run, watch.evening.account_status = self._orig
+
+    def hold(self, action, mode="INITIAL STOP", warnings=()):
+        watch.positions.run = lambda cfg: ([{"token": "X", "action": action, "mode": mode, "gain_pct": 0,
+                                             "price": 1, "stop": 1, "warnings": list(warnings)}], "")
+
+    def test_sell_alert_repeats_every_30_min(self):
+        self.hold("SELL")
+        state = {}
+        watch.check_once(self.cfg, state, False, now=1000)
+        watch.check_once(self.cfg, state, False, now=1000 + 600)
+        watch.check_once(self.cfg, state, False, now=1000 + 1800)
+        self.assertEqual(self.sent, ["SELL X now", "SELL X now"])
+
+    def test_lock_and_warning_once_then_cleared_after_sold(self):
+        self.hold("HOLD", "LOCKED (reached 2x)", ["chart in downtrend"])
+        state = {}
+        watch.check_once(self.cfg, state, False, now=1)
+        watch.check_once(self.cfg, state, False, now=2)
+        self.assertEqual(self.sent, ["X hit 2x 🎯", "Warning: X"])
+        watch.positions.run = lambda cfg: ([], "")
+        watch.check_once(self.cfg, state, False, now=3)
+        self.assertEqual(state, {})
+
+    def test_buy_alert_filters(self):
+        base = {"score": 6, "chart_trend": "PULLBACK", "chain": "solana", "token_address": "a", "symbol": "GOOD",
+                "age_minutes": 600, "hype": [], "price_usd": 1.0, "url": "u"}
+        ideas = list(watch.buy_alerts([base, dict(base, symbol="HOT", chart_trend="EXTENDED"),
+                                       dict(base, symbol="WEAK", score=2)], self.cfg))
+        self.assertEqual([i[1] for i in ideas], ["Buy idea: GOOD (solana)"])

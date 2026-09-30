@@ -14,7 +14,8 @@ import time
 import urllib.request
 
 GT = "https://api.geckoterminal.com/api/v2/networks/{net}/pools/{pool}/ohlcv/hour?aggregate=1&limit=72"
-NETWORKS = {"solana": "solana", "base": "base", "ethereum": "eth", "bsc": "bsc"}
+# DexScreener chain id -> GeckoTerminal network id (unlisted chains are passed through as-is)
+NETWORKS = {"solana": "solana", "base": "base", "ethereum": "eth", "bsc": "bsc", "monad": "monad"}
 
 
 def fetch_candles(chain, pair_address):

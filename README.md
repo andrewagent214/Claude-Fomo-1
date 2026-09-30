@@ -15,14 +15,14 @@ Your plan: **$50 → $100, max loss $30.** Full rules are in [`docs/STRATEGY.md`
 
 ```mermaid
 flowchart TD
-    A[1. Scan<br/>python3 scanner/scan.py<br/>new launches + trending + Trump/Elon keywords] --> B{Safety filters<br/>liquidity, volume, age,<br/>not already +1000%}
+    A[1. Scan<br/>python3 scanner/scan.py<br/>new launches + trending + Trump/Elon keywords<br/>Solana, Base, BNB, Ethereum, Monad] --> B{Safety filters<br/>liquidity, volume, age,<br/>not already +1000%}
     B -- fail --> X[AVOID - reason logged]
     B -- pass --> C[2. Chart check<br/>PULLBACK / UPTREND = ok<br/>EXTENDED / DOWNTREND = skip]
     C --> D[3. Watchlist<br/>output/scans/scan_*.md]
     D --> E[4. Manual research<br/>docs/RESEARCH_CHECKLIST.md<br/>verify contract is real]
     E -- red flag --> X
     E -- clear --> F[5. Buy $20 in Fomo app<br/>add row to journal/positions.csv]
-    F --> G[6. Monitor<br/>python3 scanner/positions.py]
+    F --> G[6. Monitor<br/>scanner/watch.py → phone alert]
     G --> H{Price vs stop}
     H -- above stop --> G
     H -- "at/below stop:<br/>-25% before 2x<br/>+30% floor / 35% trail after 2x" --> I[7. SELL in Fomo app<br/>move row to journal/trades.csv]
@@ -52,9 +52,25 @@ It writes `output/reports/evening_<date>.md` with:
 | Sell a coin | Delete it from positions, add a row to `journal/trades.csv`, run `python3 scanner/stats.py` |
 | Stay on longer because something is moving | Re-run `python3 scanner/positions.py` every 15–30 min |
 
-**Optional: have the brief ready when you sit down.** On your own computer, schedule it for 8:50pm:
-- Mac/Linux: `crontab -e`, then add `50 20 * * * cd ~/Claude-Fomo-1 && python3 scanner/evening.py` (uses your computer's local time)
-- Windows: Task Scheduler → daily 8:50 PM → `python scanner\evening.py`, start in the repo folder
+## Phone alerts (your stop-loss)
+
+Fomo has no limit or stop orders, so **every sell is manual**. `scanner/watch.py` fills that gap. Leave it running on a computer that stays on, and it pushes alerts to your phone:
+
+| Alert | When | Priority |
+|---|---|---|
+| 🚨 **SELL X now** | Price hit your stop (−25%, or the +30% floor / trailing stop after 2x) | Urgent. Repeats every 30 min until you sell and remove the row |
+| 🎯 **X hit 2x** | Stop just moved up to the +30% floor | High |
+| ⚠️ **Warning: X** | Downtrend, sellers > buyers, 1h drop > 15%, holders falling | Normal |
+| 💰 **Buy idea: X** | Score ≥ 5, chart PULLBACK/UPTREND, you have an open slot, 7am–11pm PT only | High. Tap it to open the chart |
+
+Setup (5 minutes):
+1. Install the free **ntfy** app on your phone (App Store / Google Play).
+2. On your computer: `python3 scanner/watch.py --test`. It creates a private topic name (saved in `config.json`), prints it, and sends a test alert.
+3. In the ntfy app, tap **+** and subscribe to that topic name. You should see the test alert.
+4. Start it: `python3 scanner/watch.py`. It checks your coins every 5 min and scans for new ones every 30 min.
+
+Keep the topic name private: anyone who knows it can read your alerts. If this repo is public, don't commit `config.json` after the topic is added.
+When you buy or sell, just edit `journal/positions.csv`. The watcher picks up the change on its next check.
 
 Each scan also appends to `output/history.csv`. The next scans use it to show how each coin's market cap has grown since it was first seen. That growth record is how "has it kept growing?" gets answered with real numbers.
 
@@ -78,6 +94,7 @@ For an offline demo, run `python3 scanner/scan.py --fixture tests/fixtures/sampl
 | `config.json` | Filters, hype keywords, and risk and exit rules |
 | `scanner/scan.py` | Live screener → `output/scans/`, `output/history.csv` |
 | `scanner/chart.py` | Hourly chart trend: UPTREND / PULLBACK / EXTENDED / DOWNTREND / CHOP |
+| `scanner/watch.py` | Phone alerts: SELL / 2x / warnings / buy ideas via ntfy |
 | `scanner/evening.py` | One-command evening brief → `output/reports/evening_<date>.md` |
 | `scanner/positions.py` | HOLD/SELL for coins you own → `output/reports/positions.md` |
 | `scanner/stats.py` | Performance from your journal → `output/reports/performance.md` |

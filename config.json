@@ -2,7 +2,10 @@
   "_comment": "Tuned to your answers (Sept 2026). Thresholds are starting assumptions, not proven edges. Change them only when journal stats (python3 scanner/stats.py) justify it.",
   "chains": [
     "solana",
-    "base"
+    "base",
+    "bsc",
+    "ethereum",
+    "monad"
   ],
   "filters": {
     "min_liquidity_usd": 20000,
@@ -42,5 +45,18 @@
     "lock_in_trigger_multiple": 2.0,
     "lock_in_floor_gain_pct": 30,
     "trail_from_peak_pct": 35
+  },
+  "high_gas_chains": [
+    "ethereum"
+  ],
+  "alerts": {
+    "ntfy_topic": "",
+    "check_positions_minutes": 5,
+    "scan_minutes": 30,
+    "min_buy_score": 5,
+    "buy_alert_hours_pt": [
+      7,
+      23
+    ]
   }
 }

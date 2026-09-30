@@ -2,6 +2,9 @@
 
 These rules come from your answers. The code enforces them: `config.json` holds the numbers, `scanner/positions.py` gives HOLD/SELL calls.
 
+## Chains
+Fomo trades Solana, Base, BNB Chain, Ethereum and Monad, and the scanner covers all five. **Ethereum** is flagged ⛽: its network fee per swap can be several dollars, which is a big slice of a $20 trade, so check the fee Fomo quotes first.
+
 ## Budget
 | Rule | Value | Why |
 |---|---|---|
@@ -24,8 +27,9 @@ Suggestion, not required: at 2x, consider selling half. That takes your original
 
 ## Only on 9–10pm PT: what changes
 - For 23 hours a day nobody is watching your coins. Meme coins can drop 50%+ in minutes, so **a stop you only check at 9pm isn't a real stop.** A coin that should have been sold at -25% can be at -70% by the time you look.
-- Best fix: if Fomo lets you set a limit or stop sell, set one at the stop price every night before you log off.
-- If it doesn't, keep new launches (under 24h old) to nights when you can stay on longer. Prefer coins that have been in an uptrend for a day or more.
+- **Fomo has no limit or stop orders**, so the only protection is you acting fast. Run `scanner/watch.py` on a computer that stays on, and your phone gets a SELL alert the moment a stop is hit.
+- Even with alerts, you'll sometimes sell well below the stop (asleep, at work, a fast crash). Assume a real loss on a bad trade can be bigger than $5. That's one more reason to keep each trade at $20.
+- Keep brand-new launches (under 24h old) for nights you can stay on longer. They can rug in minutes.
 - `scanner/evening.py` replays the hourly chart since you bought. If your stop was crossed while you were away, you get a SELL even if the price bounced back.
 
 ## Buy low, sell high: how the chart check works

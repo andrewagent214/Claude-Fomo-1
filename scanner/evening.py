@@ -77,21 +77,22 @@ def brief(cfg, held, acct, watch):
         lines.append("Nothing passed the filters tonight. Not trading is a valid outcome.")
     else:
         lines += [f"{slots} open slot(s). Top candidates (research each with docs/RESEARCH_CHECKLIST.md):", "",
-                  "| Score | Token | Chart | Hype | Age | 1h | 24h | Buy size | Stop | 2x lock-in |",
-                  "|---|---|---|---|---|---|---|---|---|---|"]
+                  "| Score | Token | Chain | Chart | Hype | Age | 1h | 24h | Buy size | Stop | 2x lock-in |",
+                  "|---|---|---|---|---|---|---|---|---|---|---|"]
         for w in watch[:5]:
             p = scan.trade_plan(w, cfg)
             age_h = (w["age_minutes"] or 0) / 60
             age = f"{age_h:.0f}h" if age_h < 48 else f"{age_h / 24:.0f}d"
-            lines.append(f"| {w['score']} | [{w['symbol']}]({w['url']}) | {w.get('chart_trend', 'n/a')} | "
+            lines.append(f"| {w['score']} | [{w['symbol']}]({w['url']}) | {scan.chain_label(w, cfg)} | "
+                         f"{w.get('chart_trend', 'n/a')} | "
                          f"{' '.join(w['hype']) or '-'} | {age}{' ⚠️' if age_h < 24 else ''} | {w['change_1h_pct']:+.1f}% | "
                          f"{w['change_24h_pct']:+.1f}% | ${p['position_usd']} | {p['stop_price']:.8g} | {p['lock_in_price']:.8g} |")
         lines += ["", "⚠️ = under 24h old. These can crash overnight while you're offline. Only buy one if you'll "
                   "stay on longer tonight, and never one whose chart says EXTENDED."]
     lines += ["", "## 4. Before you log off", "",
-              "- For each coin you hold, set a **limit sell order at the Stop price** above, if the Fomo app offers "
-              "limit/stop orders. It's the only protection while you're away.",
-              "- If the app has no such orders, only hold coins you're OK seeing drop sharply before tomorrow night.",
+              "- Fomo has no limit or stop orders, so every sell is manual. Keep `python3 scanner/watch.py` running so "
+              "your phone gets a SELL alert the moment a stop is hit.",
+              "- Only hold overnight coins you're OK seeing drop sharply before you can react.",
               "- Log any sells in journal/trades.csv and update journal/positions.csv (and the holders column).", ""]
     return "\n".join(lines)
 
